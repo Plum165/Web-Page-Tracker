@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Time Tracker Webpage</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #121212;
+      color: #f0f0f0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 600px;
+      margin: auto;
+    }
+    h1 {
+      text-align: center;
+    }
+    label, input, button {
+      display: block;
+      width: 100%;
+      margin: 10px 0;
+    }
+    button {
+      padding: 10px;
+      background-color: #1f1f1f;
+      color: white;
+      border: 1px solid #444;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #333;
+    }
+    .session-log {
+      margin-top: 20px;
+    }
+    .session-item {
+      padding: 10px;
+      border-bottom: 1px solid #444;
+    }
+    .dark-toggle {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+    }
+    #liveTimer {
+      font-size: 1.2em;
+      text-align: center;
+      margin-top: 10px;
+    }
+    #summaryChart {
+      margin-top: 30px;
+      background-color: #1e1e1e;
+      padding: 10px;
+      border-radius: 8px;
+    }
+    footer {
+      text-align: center;
+      margin-top: 30px;
+      font-size: 0.9em;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div class="dark-toggle">
+    <button onclick="toggleDarkMode()">Toggle Dark Mode</button>
+  </div>
+  <div class="container">
+    <h1>⏳ Web Usage Tracker</h1>
+    <label for="sessionName">Session Name:</label>
+    <input type="text" id="sessionName" placeholder="e.g., YouTube, Gmail, Study" />
+    <label for="sessionURL">Session URL:</label>
+    <input type="text" id="sessionURL" placeholder="e.g., https://www.youtube.com" />
+    <button onclick="startTracking()">Start Tracking</button>
+    <button onclick="stopTracking()">Stop Tracking</button>
+    <button onclick="resetLog()">Reset All</button>
+
+    <div id="liveTimer"></div>
+
+    <div class="session-log" id="sessionLog"></div>
+    <canvas id="summaryChart" width="400" height="200"></canvas>
+  </div>
+
+  <footer>
+    © 2025 Created by Moegamat
+  </footer>
+
+  <script>
+    let currentSession = null;
+    let tabRef = null;
+    let timerInterval = null;
+    let elapsedSeconds = 0;
+
+    const sessions = JSON.parse(localStorage.getItem('trackedSessions')) || [];
+    renderLog();
+    renderChart();
+
+    function startTracking() {
+      const name = document.getElementById('sessionName').value.trim();
+      const url = document.getElementById('sessionURL').value.trim();
+      if (!name || !url) return alert("Please enter both a name and a URL");
+      if (currentSession) return alert("A session is already running");
+
+      tabRef = window.open(url, '_blank');
+      currentSession = {
+        name,
+        url,
+        startTime: new Date().getTime(),
+      };
+      elapsedSeconds = 0;
+
+      document.getElementById('liveTimer').innerText = `Tracking: ${name} (0s)`;
+      timerInterval = setInterval(() => {
+        elapsedSeconds++;
+        document.getElementById('liveTimer').innerText = `Tracking: ${name} (${elapsedSeconds}s)`;
+      }, 1000);
+    }
+
+    function stopTracking() {
+      if (!currentSession) return alert("No session is currently running");
+      const endTime = new Date().getTime();
+      const duration = Math.round((endTime - currentSession.startTime) / 1000); // seconds
+      sessions.push({
+        name: currentSession.name,
+        url: currentSession.url,
+        duration,
+        date: new Date().toLocaleString(),
+      });
+      localStorage.setItem('trackedSessions', JSON.stringify(sessions));
+      renderLog();
+      renderChart();
+      document.getElementById('liveTimer').innerText = '';
+      currentSession = null;
+      if (tabRef && !tabRef.closed) {
+        tabRef.close();
+      }
+      clearInterval(timerInterval);
+    }
+
+    function resetLog() {
+      localStorage.removeItem('trackedSessions');
+      document.getElementById('sessionLog').innerHTML = '';
+      document.getElementById('summaryChart').style.display = 'none';
+      location.reload();
+    }
+
+    function renderLog() {
+      const log = document.getElementById('sessionLog');
+      log.innerHTML = '<h2>📜 Session Log</h2>';
+      sessions.forEach((s) => {
+        log.innerHTML += `<div class="session-item">
+          <strong>${s.name}</strong><br />
+          <a href="${s.url}" target="_blank">${s.url}</a><br />
+          Time Spent: ${s.duration} seconds<br />
+          Date: ${s.date}
+        </div>`;
+      });
+    }
+
+    function renderChart() {
+      const ctx = document.getElementById('summaryChart').getContext('2d');
+      const names = sessions.map(s => s.name);
+      const durations = sessions.map(s => s.duration);
+      if (window.sessionChart) window.sessionChart.destroy();
+      window.sessionChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: names,
+          datasets: [{
+            label: 'Time Spent (seconds)',
+            data: durations,
+            backgroundColor: 'rgba(75, 192, 192, 0.6)',
+            borderColor: 'rgba(75, 192, 192, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          },
+          plugins: {
+            legend: { display: false }
+          }
+        }
+      });
+    }
+
+    function toggleDarkMode() {
+      document.body.classList.toggle('light');
+      if (document.body.classList.contains('light')) {
+        document.body.style.backgroundColor = '#f0f0f0';
+        document.body.style.color = '#121212';
+      } else {
+        document.body.style.backgroundColor = '#121212';
+        document.body.style.color = '#f0f0f0';
+      }
+    }
+  </script>
+</body>
+</html>
